@@ -1,0 +1,42 @@
+/**
+ * @File Name          : UniqueYearsTrigger.cls
+ * @Description        : Counting the number of years (or streak) a donor has given over a period of time is not built into Salesforce                            and its actually really difficult to achieve - conceptually and with SOQL Limit errors. This project was to                              calculate the number of years a donor has given over a period of time. In this case, 20.
+
+ * @Author             : LPC
+ * @Group              : 
+ * @Last Modified By   : LPC
+ * @Last Modified On   : 2/26/2020, 11:35:02 AM
+ * @Modification Log   : 
+ * Ver       Date    2/26/2020        Author      	Laurie Capozza	    Modification
+ * 1.0    2/26/2020   Initial Version
+ Notes on the environment: 
+ - You will need to create two opportunity contact role fields. One will be CloseDate and the other will be Fiscal_Year.
+ - CloseDate: Formula field - that looks up the close date of the related opportunity. 
+ - Fiscal Year: Formula, Text field that calculates off the above CloseDate = TEXT(YEAR(DATEVALUE(CloseDate__c)))
+ - There are a number of reasons I chose to put this on the Opportunity Contact Role Object, rather than the Opportunity/Contact/Account. 
+ Known issue : when deleting an opportunity, it doesn't force an update.
+ **/
+
+trigger countUniqueYears20 on OpportunityContactRole (after insert, after update) {
+        for(OpportunityContactRole ocr : Trigger.new){
+            if(ocr.id !=null){
+            //system.debug('Update Triggered+++++++');
+            Contact con = [SELECT Id
+                            FROM Contact
+                            WHERE Id = :ocr.ContactId];
+            Set<String> calyear = new Set<String>();
+            List<AggregateResult> countYears = New List<AggregateResult>();
+            countYears = [SELECT COUNT_DISTINCT(Fiscal_Year__c)cnt
+                          FROM OpportunityContactRole
+                          WHERE ContactId = :ocr.ContactId
+                          AND ((CloseDate__c = LAST_N_Years:20) OR (CloseDate__c = THIS_YEAR))
+                          AND (Role = 'Donor' OR Role = 'Household Member' OR Role = 'Soft Credit')];        
+            String s = String.valueOf(countYears[0].get('cnt'));
+            Integer I = Integer.valueOf(s);
+                if(i != con.Years_Donated_Last_20__c){
+                 con.Years_Donated_Last_20__c = Integer.valueOf(I); 
+            	 update(con);    
+                }
+            }
+        }        
+    }
