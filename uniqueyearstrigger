@@ -8,7 +8,7 @@
  * @Last Modified On   : 2/26/2020, 11:35:02 AM
  * @Modification Log   : 
  * Ver       Date    2/26/2020        Author      	LPC	    Modification
- * 1.0    2/26/2020   Initial Version
+ * 1.3    2/26/2020   Initial Version
  Notes on the environment: 
  - You will need to create two opportunity contact role fields. One will be CloseDate and the other will be Fiscal_Year.
  - CloseDate: Formula field - that looks up the close date of the related opportunity. 
