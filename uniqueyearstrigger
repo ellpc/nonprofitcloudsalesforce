@@ -16,27 +16,30 @@
  - There are a number of reasons I chose to put this on the Opportunity Contact Role Object, rather than the Opportunity/Contact/Account. 
  Known issue : when deleting an opportunity, it doesn't force an update.
  **/
-
-trigger countUniqueYears20 on OpportunityContactRole (after insert, after update) {
-        for(OpportunityContactRole ocr : Trigger.new){
-            if(ocr.id !=null){
-            //system.debug('Update Triggered+++++++');
-            Contact con = [SELECT Id
-                            FROM Contact
-                            WHERE Id = :ocr.ContactId];
-            Set<String> calyear = new Set<String>();
-            List<AggregateResult> countYears = New List<AggregateResult>();
-            countYears = [SELECT COUNT_DISTINCT(Fiscal_Year__c)cnt
-                          FROM OpportunityContactRole
-                          WHERE ContactId = :ocr.ContactId
-                          AND ((CloseDate__c = LAST_N_Years:20) OR (CloseDate__c = THIS_YEAR))
-                          AND (Role = 'Donor' OR Role = 'Household Member' OR Role = 'Soft Credit')];        
-            String s = String.valueOf(countYears[0].get('cnt'));
-            Integer I = Integer.valueOf(s);
-                if(i != con.Years_Donated_Last_20__c){
-                 con.Years_Donated_Last_20__c = Integer.valueOf(I); 
-            	 update(con);    
-                }
-            }
-        }        
+trigger countUniqueYears20 on OpportunityContactRole (after insert, after update, after undelete){
+Set<ID> conIds = New Set <ID>();
+    for(OpportunityContactRole ocr : Trigger.new){
+        if(ocr.ContactId !=null){
+            conIds.add(ocr.ContactId);
+            system.Debug('Adding an Id to conIds +++' + ocr.ContactId);
+        }
     }
+    List<Contact> updateContacts = new List <Contact>();
+    for(Contact con :[SELECT Id, Years_Donated_Last_20__c FROM Contact WHERE id in :conIds]){
+        system.Debug('Made it to for Contact Con ++ ');
+        List<AggregateResult> countYears = New List<AggregateResult>();
+        countYears =[SELECT COUNT_DISTINCT(Fiscal_Year__c)cnt
+                    FROM OpportunityContactRole
+                    WHERE ContactId = :con.id
+                    AND ((CloseDate__c = LAST_N_Years:20) OR (CloseDate__c = THIS_YEAR))
+                    AND (Role = 'Donor' OR Role = 'Household Member' OR Role = 'Soft Credit')];
+            String s = String.valueOf(countYears[0].get('cnt'));
+            Integer I = Integer.valueOf(s);	
+        system.Debug('Values of strings ++ ' + s + '++++' + i);
+        if(i > 0 && con.Years_Donated_Last_20__c != I && i != null){
+            con.Years_Donated_Last_20__c = Integer.valueOf(I); 
+            update(con); 
+    }
+  }
+}
+            
