@@ -10,11 +10,12 @@
  * Ver       Date    2/26/2020        Author      	LPC	    Modification
  * 1.3    2/26/2020   Initial Version
  Notes on the environment: 
- - You will need to create two opportunity contact role fields. One will be CloseDate and the other will be Fiscal_Year.
+ - You will need to create two opportunity contact role fields. One will be CloseDate and the other will be Fiscal_Year. You COULD 
+ avoid this by doing a query of the opportunities as well - but that seemed a little unnecessary. 
  - CloseDate: Formula field - that looks up the close date of the related opportunity. 
  - Fiscal Year: Formula, Text field that calculates off the above CloseDate = TEXT(YEAR(DATEVALUE(CloseDate__c)))
  - There are a number of reasons I chose to put this on the Opportunity Contact Role Object, rather than the Opportunity/Contact/Account. 
- Known issue : when deleting an opportunity, it doesn't force an update.
+ Known issue : when deleting an opportunity, it doesn't force an update. 
  **/
 trigger CountUniqueYears20 on OpportunityContactRole (after insert,after update,after undelete){
     Set<String> contactIds = new set<String>();//create set on trigger( using a set so there are no duplicates)
