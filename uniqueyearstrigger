@@ -15,7 +15,7 @@
  - CloseDate: Formula field - that looks up the close date of the related opportunity. 
  - Fiscal Year: Formula, Text field that calculates off the above CloseDate = TEXT(YEAR(DATEVALUE(CloseDate__c)))
  - There are a number of reasons I chose to put this on the Opportunity Contact Role Object, rather than the Opportunity/Contact/Account. 
- Known issue : when deleting an opportunity, it doesn't force an update. 
+ Known issue : when deleting an opportunity, it doesn't force an update - will add that in another iteration but there's a time constraint.
  **/
 trigger CountUniqueYears20 on OpportunityContactRole (after insert,after update,after undelete){
     Set<String> contactIds = new set<String>();//create set on trigger( using a set so there are no duplicates)
