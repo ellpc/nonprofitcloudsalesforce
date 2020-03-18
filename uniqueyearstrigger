@@ -18,30 +18,92 @@
  Known issue : when deleting an opportunity, it doesn't force an update - will add that in another iteration but there's a time constraint.
  **/
 trigger CountUniqueYears20 on OpportunityContactRole (after insert,after update,after undelete){
-    Set<String> contactIds = new set<String>();//create set on trigger( using a set so there are no duplicates)
+    Set<String> contactIds = new set<String>();
+   //For each affected role, check the contact Id - add it to the set.  
     for(OpportunityContactRole ocr : Trigger.new){
-        contactIds.add(ocr.ContactId);//For each affected role, check the contact Id - add it to the set. 
+        contactIds.add(ocr.ContactId);
     } 
-    List<AggregateResult> arList = [SELECT ContactId, COUNT_DISTINCT(Fiscal_Year__c) cnt 
+    List<AggregateResult> arList = [SELECT ContactId, COUNT_DISTINCT(Fiscal_Year__c) cnt
                                     FROM OpportunityContactRole
                                     WHERE ContactId In :contactIds
                                     AND ((CloseDate__c = LAST_N_Years:20) OR (CloseDate__c = THIS_YEAR))
                                     AND ((Role = 'Donor') OR (Role = 'Household Member') OR (Role = 'Soft Credit'))
-                                    GROUP BY ContactId];//query ocr for the appropriate counts.
-    Map<Id, Decimal > resultMap = new Map<Id, Decimal>();//Create a map with the key being the contact ID & The new value is the year cnt from above.
-    if(arList.isEmpty() == FALSE){ 
+                                    GROUP BY ContactId];
+    //Create a map with the key being the contact ID & The new value is the year cnt from above.
+    Map<Id, Decimal > resultMap = new Map<Id, Decimal>();
+    //populate the map with the aggregate results
+    if(arList.isEmpty() == FALSE){
         for(AggregateResult ar : arList){
             resultMap.put((Id)ar.get('ContactId'),(Decimal)ar.get('cnt'));
-        }//populate the map with the aggregate results
-        List<Contact> contactsToUpdate = new List<Contact>();//create a list of contacts to update in bulk so we keep the queries low. Then update.
-        for (Id key : resultMap.keySet()){
-            contactsToUpdate.add(
-                new Contact(
-                    Id = key,
-                    Years_Donated_Last_20__c = (Integer)resultMap.get(key)));
         }
-        if(contactsToUpdate.size() > 0){
-            update contactsToUpdate;
+        //create a list of contacts to update in bulk so we keep the queries low. Then update.
+        List<Contact> yearsToUpdate = new List<Contact>();
+        List<Contact> ecStatusUpdate = new List<Contact>();
+        List<Task> tasksToInsert = new List<Task>();
+ 		Map <Id, Contact> contactList = new Map<Id, Contact>([SELECT Id, YOURNAME_Circle_Lapsed_Member__c, YOURNAME_Circle_Lapsed_Year__c, npsp__Deceased__c, Years_Donated_Last_20__c, YOURNAME_Circle_Induction_Year__c
+                                                   FROM Contact
+                                                   WHERE Id in :resultMap.keySet()]);
+        for (Id key : resultMap.keySet()){
+            Contact conG = new Contact(
+                    	   Id = key,
+                    	   Years_Donated_Last_20__c = (Integer)resultMap.get(key));
+            yearsToUpdate.add(conG);
+            Contact conS = contactList.get(key); 
+            //this is for building the task & ec status list. 
+            if((conS.Years_Donated_Last_20__c != resultMap.get(key)) && (conS.npsp__Deceased__c == FALSE)){   
+                if((conS.Years_Donated_Last_20__c == 14) && (resultMap.get(key) == 15) && (conS.YOURNAME_Circle_Lapsed_Member__c == FALSE) && (conS.YOURNAME_Circle_Lapsed_Year__c == null)){
+                    //they're a new member! add them to the task list and update induction year.
+                    tasksToInsert.add(
+                        new Task (
+                            WhoID = key,
+                            Subject = 'New YOURNAME Circle Member Induction!',
+                            Status = 'Not Started',
+                            Type = 'Donor Services'));
+                    ecStatusUpdate.add(
+                     	New Contact(
+							Id = key,
+                            YOURNAME_Circle_Induction_Year__c = system.today()));
+                }
+                else if(resultMap.get(key) >= 15 && conS.YOURNAME_Circle_Lapsed_Member__c == TRUE){
+                    //they were re-inducted so unlapse them. Should we update induction year again?
+                    tasksToInsert.add(
+                        new Task (
+                            WhoID = key,
+                            Subject = 'Lapsed YOURNAME Member has Qualified Again!',
+                            Status = 'Not Started',
+                            Type = 'Donor Services'));
+                    ecStatusUpdate.add(
+                     	new Contact(
+							Id = key,
+                            YOURNAME_Circle_Lapsed_Member__c = FALSE));    
+                }
+                else if(resultmap.get(key)<= 14 && conS.YOURNAME_Circle_Lapsed_Member__c == FALSE && conS.Years_Donated_Last_20__c == 15){
+                    //they're newly lapsed. check lapsed box, write lapsed date.
+                    tasksToInsert.add(
+                        new Task (
+                            WhoID = key,
+                            Subject = 'Lapsed YOURNAME Member!',
+                            Status = 'Not Started',
+                            Type = 'Donor Services'));
+                    ecStatusUpdate.add(
+                     	new Contact(
+							Id = key,
+                            YOURNAME_Circle_Lapsed_Member__c = TRUE,
+                            YOURNAME_Circle_Lapsed_Year__c = system.today())); 
+                }
+                else{
+                    system.debug('No elses +++');
+                }
+            }  
+        }
+        if(yearsToUpdate.size() > 0){
+            update yearsToUpdate;
+        }
+        if(tasksToInsert.size() > 0){
+            insert tasksToInsert;
+        }
+        if(ecStatusUpdate.size() >0){
+            update ecStatusUpdate;
         } 
     }
 }
